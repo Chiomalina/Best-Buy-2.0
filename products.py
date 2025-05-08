@@ -77,3 +77,54 @@ class Product:
 
     def __str__(self) -> str:
         return self.show()
+
+
+class NonStockedProduct(Product):
+    """
+    A product that has no stock tracking (e.g. software licenses).
+    Quantity is always zero but the product remains active and
+    can be 'bought' any number of times.
+    """
+    def __init__(self, name: str, price: float) -> None:
+        # initialize with zero quantity
+        super().__init__(name, price, quantity=0)
+        # ensure it stays active
+        self.activate()
+
+    def set_quantity(self, quantity: int) -> None:
+        # ignore any attempts to change quantity; always zero
+        self._quantity = 0
+        self.activate()
+
+    def buy(self, quantity: int) -> float:
+        # only check for positive integer
+        if not isinstance(quantity, int) or quantity <= 0:
+            raise ValueError("Purchase quantity must be a positive integer.")
+        return self._price * quantity
+
+    def show(self) -> str:
+        return f"{self._name}, Price: {self._price} (Non-Stocked)"
+
+
+class LimitedProduct(Product):
+    """
+    A product that has a per-order purchase limit.
+    E.g. a shipping fee that can only be added once.
+    """
+    def __init__(self, name: str, price: float, quantity: int, maximum: int) -> None:
+        super().__init__(name, price, quantity)
+        if not isinstance(maximum, int) or maximum <= 0:
+            raise ValueError("Maximum must be a positive integer.")
+        self.maximum = maximum
+
+    def buy(self, quantity: int) -> float:
+        # enforce per-order limit
+        if quantity > self.maximum:
+            raise Exception(f"Cannot buy more than {self.maximum} of '{self._name}' per order.")
+        # delegate stock checks and deduction to base class
+        return super().buy(quantity)
+
+    def show(self) -> str:
+        base = super().show()
+        return f"{base} (Max {self.maximum}/order)"
+
