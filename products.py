@@ -1,5 +1,7 @@
 # products.py
 
+from typing import Optional
+
 class Product:
     def __init__(self, name: str, price: float, quantity: int) -> None:
         """
@@ -17,8 +19,10 @@ class Product:
         self._price: float = float(price)
         self._quantity: int = 0
         self._active: bool = False
+        # Promotion, if any
+        self._promotion: Optional["Promotion"] = None
 
-        # Use the setter logic to initialize quantity & active state
+        # Initialize quantity (sets active state)
         self.set_quantity(quantity)
 
     def get_quantity(self) -> int:
@@ -52,9 +56,27 @@ class Product:
         else:
             self.deactivate()
 
+    def set_promotion(self, promo: Optional["Promotion"]) -> None:
+        """
+        Attach or remove a promotion to this product.
+        `promo` must be an instance of promotions.Promotion or None.
+        """
+        if promo is not None:
+            from promotions import Promotion
+            if not isinstance(promo, Promotion):
+                raise TypeError("promotion must be a Promotion instance or None")
+        self._promotion = promo
+
+    def get_promotion(self) -> Optional["Promotion"]:
+        """Return the current promotion or None if not set."""
+        return self._promotion
+
     def show(self) -> str:
-        """Return a human-readable description of this product."""
-        return f"{self._name}, Price: {self._price}, Quantity: {self._quantity}"
+        """Return a description of this product."""
+        base = f"{self._name}, Price: ${self._price}, Quantity: {self._quantity}"
+        if self._promotion:
+            base += f"  ▶ Promo: {self._promotion.name}"
+        return base
 
     def buy(self, quantity: int) -> float:
         """
@@ -67,10 +89,16 @@ class Product:
             raise Exception("Cannot buy an inactive product.")
         if not isinstance(quantity, int) or quantity <= 0:
             raise ValueError("Purchase quantity must be a positive integer.")
+        # stock check
         if quantity > self._quantity:
             raise ValueError("Not enough items in stock.")
 
-        total_price = self._price * quantity
+        # calculate price via promotion if set
+        if self._promotion:
+            total_price = self._promotion.apply_promotion(self, quantity)
+        else:
+            total_price = self._price * quantity
+
         # Deduct from stock and adjust active flag if needed
         self.set_quantity(self._quantity - quantity)
         return total_price
@@ -100,10 +128,16 @@ class NonStockedProduct(Product):
         # only check for positive integer
         if not isinstance(quantity, int) or quantity <= 0:
             raise ValueError("Purchase quantity must be a positive integer.")
+        # apply promotion if present
+        if self._promotion:
+            return self._promotion.apply_promotion(self, quantity)
         return self._price * quantity
 
     def show(self) -> str:
-        return f"{self._name}, Price: {self._price} (Non-Stocked)"
+        base = f"{self._name}, Price: ${self._price}, Quantity: Unlimited,"
+        if self._promotion:
+            base += f"  ▶ Promotion: {self._promotion.name}"
+        return base
 
 
 class LimitedProduct(Product):
@@ -121,10 +155,8 @@ class LimitedProduct(Product):
         # enforce per-order limit
         if quantity > self.maximum:
             raise Exception(f"Cannot buy more than {self.maximum} of '{self._name}' per order.")
-        # delegate stock checks and deduction to base class
         return super().buy(quantity)
 
     def show(self) -> str:
         base = super().show()
-        return f"{base} (Max {self.maximum}/order)"
-
+        return f"{base} (Limited to {self.maximum} per order!), Promotion: None"
