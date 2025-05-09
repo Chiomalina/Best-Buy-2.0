@@ -1,5 +1,3 @@
-# test_store.py
-
 from products import Product
 from store import Store
 

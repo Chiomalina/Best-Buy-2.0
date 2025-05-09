@@ -1,22 +1,30 @@
 import sys
 from typing import List, Tuple
 
-from products import Product, NonStockedProduct, LimitedProduct
-from promotions import SecondHalfPrice, ThirdOneFree, PercentDiscount
+from products import (
+    LimitedProduct,
+    NonStockedProduct,
+    Product,
+)
+from promotions import (
+    PercentDiscount,
+    SecondHalfPrice,
+    ThirdOneFree,
+)
 from store import Store
 
 
 def list_products(store: Store) -> None:
     """Print all active products with their full description."""
-    products = store.get_all_products()
-    if not products:
+    active = store.get_all_products()
+    if not active:
         print("No active products in the store.")
         return
 
     print("\nActive Products:")
-    for prod in products:
-        # show() includes name, price, quantity, and promo
-        print(f"- {prod.show()}")
+    for product in active:
+        # __str__ shows full details including promos
+        print(f"- {product}")
 
 
 def show_total(store: Store) -> None:
@@ -27,105 +35,107 @@ def show_total(store: Store) -> None:
 
 def handle_order(store: Store) -> None:
     """Interactive flow for building and placing an order."""
-    active_products = store.get_all_products()
-    if not active_products:
+    active = store.get_all_products()
+    if not active:
         print("No active products available for ordering.")
         return
 
     print("\nAvailable for Order:")
-    for idx, prod in enumerate(active_products, start=1):
-        promo = prod.get_promotion()
+    for idx, product in enumerate(active, start=1):
+        promo = product.get_promotion()
         unit_price = (
-            promo.apply_promotion(prod, 1)
+            promo.apply_promotion(product, 1)
             if promo
-            else prod._price
+            else product.price
         )
-        promo_label = f" [{promo.name}]" if promo else ""
-        print(f"{idx}. {prod._name} — unit price: ${unit_price:.2f}{promo_label}")
+        label = f" [{promo.name}]" if promo else ""
+        print(f"{idx}. {product.name} — ${unit_price:.2f}{label}")
 
-    shopping_list: List[Tuple[Product, int]] = []
+    shopping: List[Tuple[Product, int]] = []
     while True:
-        selection = input("\nEnter product number to add (or press Enter to finish): ")
-        if not selection:
+        choice = input("\nEnter product number to add (or press Enter to finish): ")
+        if not choice:
             break
 
         try:
-            idx = int(selection) - 1
-            chosen = active_products[idx]
+            index = int(choice) - 1
+            selected = active[index]
         except (ValueError, IndexError):
             print("Invalid product number. Please try again.")
             continue
 
-        qty_str = input(f"Enter quantity of '{chosen._name}' to purchase: ")
+        qty_input = input(f"Enter quantity of '{selected.name}' to purchase: ")
         try:
-            qty = int(qty_str)
+            quantity = int(qty_input)
         except ValueError:
             print("Quantity must be a positive integer.")
             continue
 
-        if qty <= 0:
+        if quantity <= 0:
             print("Quantity must be greater than zero.")
             continue
 
-        # skip stock check for non‑stocked products
-        if not isinstance(chosen, NonStockedProduct) and qty > chosen.get_quantity():
-            print(f"Only {chosen.get_quantity()} units available. Please enter a smaller amount.")
+        if (
+            not isinstance(selected, NonStockedProduct)
+            and quantity > selected.get_quantity()
+        ):
+            available = selected.get_quantity()
+            print(f"Only {available} units available. Please enter a smaller amount.")
             continue
 
-        shopping_list.append((chosen, qty))
-        print(f"Added {qty} x {chosen._name} to your cart.")
+        shopping.append((selected, quantity))
+        print(f"Added {quantity} × {selected.name} to your cart.")
 
-    if not shopping_list:
+    if not shopping:
         print("No items were selected for the order.")
         return
 
     print("\nReviewing your cart:")
     total_cost = 0.0
-    for item, qty in shopping_list:
+    for product, qty in shopping:
         try:
-            cost = item.buy(qty)
-        except Exception as e:
-            print(f"Cannot buy {qty}×{item._name}: {e}")
+            cost = product.buy(qty)
+        except Exception as exc:
+            print(f"Cannot buy {qty} × {product.name}: {exc}")
             continue
-        print(f" - {qty}×{item._name}: ${cost:.2f}")
+
+        print(f" - {qty} × {product.name}: ${cost:.2f}")
         total_cost += cost
 
     print(f"\nOrder complete! Total cost: ${total_cost:.2f}")
 
 
-def start(store_instance: Store) -> None:
-    """
-    Launch the interactive console menu for the store.
-    """
+def start(store: Store) -> None:
+    """Launch the interactive console menu for the store."""
     menu = (
-        "\nStore Menu"
-        "\n----------"
-        "\n1. List all products in store"
-        "\n2. Show total amount in store"
-        "\n3. Make an order"
-        "\n4. Quit"
+        "\nStore Menu\n"
+        "----------\n"
+        "1. List all products in store\n"
+        "2. Show total amount in store\n"
+        "3. Make an order\n"
+        "4. Quit"
     )
 
     actions = {
-        1: lambda: list_products(store_instance),
-        2: lambda: show_total(store_instance),
-        3: lambda: handle_order(store_instance),
+        1: lambda: list_products(store),
+        2: lambda: show_total(store),
+        3: lambda: handle_order(store),
     }
 
     while True:
         print(menu)
-        choice_str = input("\nPlease choose a number (1-4): ")
+        choice = input("\nPlease choose a number (1–4): ")
         try:
-            choice = int(choice_str)
+            option = int(choice)
         except ValueError:
             print("Invalid input: please enter a number between 1 and 4.")
             continue
 
-        if choice == 4:
-            print("Exiting... Goodbye!")
+        if option == 4:
+            print("Exiting… Goodbye!")
             break
 
-        action = actions.get(choice)
+        action = actions.get(option)
         if action:
             action()
         else:
@@ -133,33 +143,33 @@ def start(store_instance: Store) -> None:
 
 
 def main() -> None:
-    """
-    Entry point: initializes store inventory and starts the UI.
-    """
+    """Entry point: initializes store inventory and starts the UI."""
     try:
-        product_list = [
+        products_list = [
             Product("MacBook Air M2", price=1450, quantity=100),
             Product("Bose QuietComfort Earbuds", price=250, quantity=500),
             Product("Google Pixel 7", price=500, quantity=250),
             NonStockedProduct("Windows License", price=125),
-            LimitedProduct("Shipping", price=10, quantity=250, maximum=1),
+            LimitedProduct(
+                "Shipping", price=10, quantity=250, maximum=1
+            ),
         ]
     except ValueError as error:
         print(f"Error creating products: {error}")
         sys.exit(1)
 
     # Create promotion catalog
-    second_half_price = SecondHalfPrice("Second Half Price!")
-    third_one_free    = ThirdOneFree("Third One Free!")
-    thirty_percent    = PercentDiscount("30% Off!", percent=30)
+    second_half = SecondHalfPrice("Second Half Price!")
+    third_free = ThirdOneFree("Third One Free!")
+    percent_30 = PercentDiscount("30% Off!", percent=30)
 
     # Attach promotions
-    product_list[0].set_promotion(second_half_price)
-    product_list[1].set_promotion(third_one_free)
-    product_list[3].set_promotion(thirty_percent)
+    products_list[0].set_promotion(second_half)
+    products_list[1].set_promotion(third_free)
+    products_list[3].set_promotion(percent_30)
 
-    best_buy = Store(product_list)
-    start(best_buy)
+    store_instance = Store(products_list)
+    start(store_instance)
 
 
 if __name__ == "__main__":
